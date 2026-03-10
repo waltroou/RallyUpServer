@@ -1,0 +1,95 @@
+#!/bin/bash
+
+# Rally Server Startup Script
+# This script starts MongoDB and the Java Spring Boot backend
+
+# Color codes for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}   Rally Server Startup${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+
+# Start MongoDB with Docker
+echo -e "${BLUE}Starting MongoDB with Docker...${NC}"
+if ! docker ps | grep -q rally-mongodb; then
+    if docker ps -a | grep -q rally-mongodb; then
+        echo -e "${YELLOW}Starting existing MongoDB container...${NC}"
+        docker start rally-mongodb
+    else
+        echo -e "${YELLOW}Creating new MongoDB container...${NC}"
+        docker-compose up -d mongodb
+    fi
+    echo -e "${GREEN}MongoDB started successfully${NC}"
+    sleep 3
+else
+    echo -e "${GREEN}MongoDB already running${NC}"
+fi
+echo ""
+
+# Function to check if a port is in use
+check_port() {
+    lsof -ti:$1 > /dev/null 2>&1
+}
+
+# Kill any existing backend process on port 8080
+if check_port 8080; then
+    echo -e "${YELLOW}Stopping existing backend on port 8080...${NC}"
+    lsof -ti:8080 | xargs kill -9 2>/dev/null
+    sleep 2
+fi
+
+# Start the backend
+echo -e "${BLUE}Starting Rally Backend...${NC}"
+
+# Check if Maven wrapper exists
+if [ -f "./mvnw" ]; then
+    echo -e "${GREEN}Using Maven wrapper${NC}"
+    chmod +x ./mvnw
+    ./mvnw spring-boot:run > backend.log 2>&1 &
+elif command -v mvn &> /dev/null; then
+    echo -e "${GREEN}Using system Maven${NC}"
+    mvn spring-boot:run > backend.log 2>&1 &
+else
+    echo -e "${RED}Maven not found! Please install Maven or use the Maven wrapper.${NC}"
+    exit 1
+fi
+
+BACKEND_PID=$!
+echo -e "${GREEN}Backend started with PID: $BACKEND_PID${NC}"
+echo ""
+
+# Wait for backend to start
+echo -e "${BLUE}Waiting for backend to start...${NC}"
+for i in {1..30}; do
+    if curl -s http://localhost:8080/api/auth/me > /dev/null 2>&1; then
+        echo -e "${GREEN}Backend is ready!${NC}"
+        break
+    fi
+    echo -n "."
+    sleep 1
+done
+echo ""
+
+echo -e "${BLUE}========================================${NC}"
+echo -e "${GREEN}Rally Server Started Successfully!${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo ""
+echo -e "${GREEN}Services:${NC}"
+echo -e "  - MongoDB:        ${BLUE}mongodb://localhost:27017${NC}"
+echo -e "  - Mongo Express:  ${BLUE}http://localhost:8081${NC} (admin/admin123)"
+echo -e "  - Backend API:    ${BLUE}http://localhost:8080/api${NC}"
+echo ""
+echo -e "${YELLOW}Logs:${NC}"
+echo -e "  - Backend: ${BLUE}tail -f backend.log${NC}"
+echo -e "  - MongoDB: ${BLUE}docker logs -f rally-mongodb${NC}"
+echo ""
+echo -e "${YELLOW}To stop:${NC}"
+echo -e "  - Backend: ${BLUE}kill $BACKEND_PID${NC}"
+echo -e "  - MongoDB: ${BLUE}docker-compose down${NC}"
+echo ""
