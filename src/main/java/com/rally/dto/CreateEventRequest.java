@@ -29,5 +29,7 @@ public class CreateEventRequest {
     @NotNull(message = "Max players is required")
     @Min(value = 2, message = "Max players must be at least 2")
     private Integer maxPlayers;
+
+    private Boolean isPublic = true; // Default to public events
 }
 

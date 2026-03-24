@@ -37,6 +37,8 @@ public class Event {
 
     private String creatorId;
 
+    private Boolean isPublic = true; // Default to public events
+
     @CreatedDate
     private LocalDateTime createdAt;
 

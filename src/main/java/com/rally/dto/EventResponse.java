@@ -24,6 +24,7 @@ public class EventResponse {
     private Integer currentPlayers;
     private String creatorId;
     private String creatorName;
+    private Boolean isPublic;
     private LocalDateTime createdAt;
     private List<ParticipantResponse> participants;
 }

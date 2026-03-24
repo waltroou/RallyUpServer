@@ -39,9 +39,18 @@ public class EventController {
     @GetMapping
     public ResponseEntity<List<EventResponse>> getAllEvents(
             @RequestParam(required = false) String sport,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        List<EventResponse> events = eventService.getAllEvents(sport, date);
-        return ResponseEntity.ok(events);
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            HttpSession session) {
+        try {
+            // Try to get current user - if authenticated, show personalized events
+            String userId = authService.getCurrentUserId(session);
+            List<EventResponse> events = eventService.getAllEventsForUser(userId, sport, date);
+            return ResponseEntity.ok(events);
+        } catch (RuntimeException e) {
+            // If not authenticated, show only public events
+            List<EventResponse> events = eventService.getAllEvents(sport, date);
+            return ResponseEntity.ok(events);
+        }
     }
 
     @GetMapping("/{id}")
@@ -95,6 +104,31 @@ public class EventController {
         try {
             String userId = authService.getCurrentUserId(session);
             eventService.verifyAttendance(id, userId, request.getVerificationCode());
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> deleteEvent(@PathVariable String id, HttpSession session) {
+        try {
+            String userId = authService.getCurrentUserId(session);
+            eventService.deleteEvent(id, userId);
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            return ResponseEntity.badRequest().build();
+        }
+    }
+
+    @PostMapping("/{id}/kick/{participantUserId}")
+    public ResponseEntity<Void> kickParticipant(
+            @PathVariable String id,
+            @PathVariable String participantUserId,
+            HttpSession session) {
+        try {
+            String organizerId = authService.getCurrentUserId(session);
+            eventService.kickParticipant(id, organizerId, participantUserId);
             return ResponseEntity.ok().build();
         } catch (RuntimeException e) {
             return ResponseEntity.badRequest().build();
